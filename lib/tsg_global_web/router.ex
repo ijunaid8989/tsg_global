@@ -7,5 +7,7 @@ defmodule TsgGlobalWeb.Router do
 
   scope "/api", TsgGlobalWeb do
     pipe_through :api
+
+    resources("/rating", CDRController, only: [:create, :show], param: "client_code")
   end
 end
