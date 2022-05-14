@@ -141,7 +141,9 @@ defmodule TsgGlobal.RatingService do
     ~r[(?<day>\d{1,2})/(?<month>\d{1,2})/(?<year>\d{4}) (?<hour>\d{1,2}):(?<minutes>\d{1,2}):(?<seconds>\d{1,2})]
     |> Regex.named_captures(datetime)
     |> case do
-      nil -> DateTime.utc_now()
+      nil ->
+        DateTime.utc_now()
+
       %{
         "day" => day,
         "hour" => hour,
