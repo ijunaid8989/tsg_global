@@ -29,7 +29,18 @@ defmodule TsgGlobalWeb.CDRControllerTest do
     success: false,
     timestamp: ~U[2022-05-14 07:38:00Z]
   }
-  @invalid_attrs %{carrier: nil, client_code: nil, client_name: nil, destination_number: nil, direction: nil, rating: nil, service_type: nil, source_number: nil, success: nil, timestamp: nil}
+  @invalid_attrs %{
+    carrier: nil,
+    client_code: nil,
+    client_name: nil,
+    destination_number: nil,
+    direction: nil,
+    rating: nil,
+    service_type: nil,
+    source_number: nil,
+    success: nil,
+    timestamp: nil
+  }
 
   setup %{conn: conn} do
     {:ok, conn: put_req_header(conn, "accept", "application/json")}
