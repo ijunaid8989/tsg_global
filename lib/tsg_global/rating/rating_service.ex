@@ -5,6 +5,7 @@ defmodule TsgGlobal.RatingService do
 
   import Ecto.Query, warn: false
   alias TsgGlobal.Repo
+  alias Ecto.Multi
 
   alias NimbleCSV.RFC4180, as: CSV
 
@@ -40,7 +41,7 @@ defmodule TsgGlobal.RatingService do
   end
 
   def insert_ratings(cdrs) do
-    {valid, invalid} =
+    {valid, _invalid} =
       cdrs
       |> Enum.filter(&(&1.success == true))
       |> Enum.reduce({[], []}, fn cdr, {cdr_with_rating, invalid_service_type} = _acc ->
@@ -49,13 +50,18 @@ defmodule TsgGlobal.RatingService do
                DateTime.to_unix(cdr.timestamp),
                cdr.direction,
                cdr.service_type
-             )
-             |> IO.inspect() do
-          {:error, "ratings not available"} -> {cdr_with_rating, [cdr | invalid_service_type]}
-          rate -> {[Map.put(cdr, :rating, rate) | cdr_with_rating], invalid_service_type}
+             ) do
+          {:error, "ratings not available"} ->
+            {cdr_with_rating, [cdr | invalid_service_type]}
+
+          rate ->
+            {[Map.put(cdr, :rating, rate) | cdr_with_rating], invalid_service_type}
         end
       end)
-      |> IO.inspect()
+
+    Multi.new()
+    |> Multi.insert_all(:insert_all, CDR, valid)
+    |> Repo.transaction()
   end
 
   defp get_service_rate(client_code, date, direction, service_type) do

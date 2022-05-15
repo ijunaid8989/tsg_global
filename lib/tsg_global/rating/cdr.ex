@@ -13,8 +13,6 @@ defmodule TsgGlobal.Rating.CDR do
     field(:source_number, :string)
     field(:success, :boolean, default: false)
     field(:timestamp, :utc_datetime)
-
-    timestamps()
   end
 
   @doc false
