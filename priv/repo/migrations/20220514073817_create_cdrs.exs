@@ -16,5 +16,6 @@ defmodule TsgGlobal.Repo.Migrations.CreateCdrs do
     end
 
     create index(:cdrs, [:client_code])
+    create unique_index(:cdrs, [:client_code, :source_number, :destination_number, :direction, :service_type, :timestamp])
   end
 end

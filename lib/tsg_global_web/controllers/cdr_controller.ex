@@ -5,6 +5,7 @@ defmodule TsgGlobalWeb.CDRController do
 
   action_fallback TsgGlobalWeb.FallbackController
 
+  @spec create(any, map) :: {:error, atom | %{__changeset__: map}} | Plug.Conn.t()
   def create(conn, %{"file" => %Plug.Upload{} = file}) do
     with {:ok, cdrs} <- RatingService.import(file.path),
          {:ok, _stats} <- RatingService.insert_ratings(cdrs) do

@@ -11,7 +11,7 @@ defmodule TsgGlobal.RatingService do
 
   alias TsgGlobal.Rating.CDR
 
-  @spec import(any) :: {:ok, list()} | {:error, :csv_file_error}
+  @spec import(any) :: {:ok, list()} | {:error, atom()}
   def import(file_path \\ "priv/csvs/cdrs.csv") do
     cdrs =
       File.stream!(file_path)
@@ -75,6 +75,7 @@ defmodule TsgGlobal.RatingService do
     end
   end
 
+  @spec insert_ratings(list()) :: {:ok, map()} | {:error, atom()}
   def insert_ratings(cdrs) do
     {valid, _invalid} =
       cdrs
@@ -97,7 +98,7 @@ defmodule TsgGlobal.RatingService do
     case length(valid) > 0 do
       true ->
         Multi.new()
-        |> Multi.insert_all(:insert_all, CDR, valid)
+        |> Multi.insert_all(:insert_all, CDR, valid, on_conflict: :nothing)
         |> Repo.transaction()
 
       false ->
