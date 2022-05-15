@@ -38,9 +38,7 @@ defmodule TsgGlobal.Rating.CDR do
       :direction,
       :service_type,
       :success,
-      :carrier,
-      :timestamp,
-      :rating
+      :carrier
     ])
   end
 end

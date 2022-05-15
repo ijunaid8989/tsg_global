@@ -11,33 +11,49 @@ defmodule TsgGlobal.RatingService do
 
   alias TsgGlobal.Rating.CDR
 
+  @spec import(any) :: {:ok, list()} | {:error, :csv_file_error}
   def import(file_path \\ "priv/csvs/cdrs.csv") do
-    File.stream!(file_path)
-    |> CSV.parse_stream()
-    |> Stream.map(fn [
-                       client_code,
-                       client_name,
-                       source_number,
-                       destination_number,
-                       direction,
-                       service_type,
-                       success,
-                       carrier,
-                       timestamp
-                     ] ->
-      %{
-        client_code: String.downcase(client_code),
-        client_name: client_name,
-        source_number: source_number,
-        destination_number: destination_number,
-        direction: String.downcase(direction),
-        service_type: String.downcase(service_type),
-        success: bool?(success),
-        carrier: carrier,
-        timestamp: parse_datetime(timestamp)
-      }
-    end)
-    |> Enum.to_list()
+    cdrs =
+      File.stream!(file_path)
+      |> CSV.parse_stream()
+      |> Stream.map(fn [
+                         client_code,
+                         client_name,
+                         source_number,
+                         destination_number,
+                         direction,
+                         service_type,
+                         success,
+                         carrier,
+                         timestamp
+                       ] ->
+        %{
+          client_code: String.downcase(client_code),
+          client_name: client_name,
+          source_number: source_number,
+          destination_number: destination_number,
+          direction: String.downcase(direction),
+          service_type: String.downcase(service_type),
+          success: bool?(success),
+          carrier: carrier,
+          timestamp: parse_datetime(timestamp)
+        }
+      end)
+      |> Enum.to_list()
+
+    {:ok, cdrs}
+  rescue
+    _error ->
+      {:error, :csv_file_error}
+  end
+
+  def validate_cdrs(cdrs) do
+    Enum.map(cdrs, &CDR.changeset(%CDR{}, &1))
+    |> Enum.filter(&(&1.valid? == false))
+    |> case do
+      [] -> :ok
+      list -> {:error, List.first(list)}
+    end
   end
 
   def insert_ratings(cdrs) do
