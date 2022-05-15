@@ -9,12 +9,12 @@ defmodule TsgGlobal.Repo.Migrations.CreateCdrs do
       add :destination_number, :string
       add :direction, :string
       add :service_type, :string
-      add :success, :boolean, default: false, null: false
+      add :success, :boolean, default: true, null: false
       add :carrier, :string
       add :timestamp, :utc_datetime
       add :rating, :float
-
-      timestamps()
     end
+
+    create index(:cdrs, [:client_code])
   end
 end
