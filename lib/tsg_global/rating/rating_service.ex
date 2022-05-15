@@ -3,13 +3,14 @@ defmodule TsgGlobal.RatingService do
   The Rating context.
   """
 
+  @batch_size 65535
+
   import Ecto.Query, warn: false
   alias TsgGlobal.Repo
 
   alias NimbleCSV.RFC4180, as: CSV
 
   alias TsgGlobal.Rating.CDR
-
 
   @doc """
   By pass the coming params from controller, we are supporting 2 type of params for CDRs.
@@ -207,6 +208,17 @@ defmodule TsgGlobal.RatingService do
       timestamp: ~U[2021-01-01 00:02:18Z]
     },
 
+  ## NOTE IMP
+
+  This problem can be solved by multiple solutions, such as
+  1. Queue processing, i.e Kafka, RabbitMQ, Oban
+  2. Broadway, Flow or GenStage
+  3. Task.async_stream/3
+
+  As its stated that `average customer daily makes few million transactions` the very first 2 solution can be an overkill for that purpose.
+  The Below method of Repo.insert_all() is doing a trick of Batch size accepted by PostgreSQL and inserting chunk by chunk to DB.
+
+  If requests may increase we can go to Task.async_stream() with max_concurrency: 10 (or 8 depends on Cores)
   """
   @spec insert_ratings(list()) :: :ok | {:error, atom()}
   def insert_ratings(cdrs) do
@@ -230,7 +242,21 @@ defmodule TsgGlobal.RatingService do
 
     case length(valid_cdrs) > 0 do
       true ->
-        Repo.insert_all(CDR, valid_cdrs, on_conflict: :nothing)
+        # NOTE IMP See above Docs
+
+        # 1
+        list_of_chunks = Enum.chunk_every(valid_cdrs, @batch_size)
+
+        Repo.transaction(
+          fn ->
+            Enum.each(list_of_chunks, fn rows ->
+              Repo.insert_all(CDR, rows, on_conflict: :nothing)
+            end)
+          end,
+          timeout: :infinity
+        )
+
+        # 2 Repo.insert_all(CDR, valid_cdrs, on_conflict: :nothing)
         :ok
 
       false ->
