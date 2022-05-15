@@ -288,7 +288,11 @@ defmodule TsgGlobal.RatingService do
     charges_by_service =
       CDR
       |> group_by([cdr], cdr.service_type)
-      |> select([cdr], %{service_type: cdr.service_type, sum: sum(cdr.rating)})
+      |> select([cdr], %{
+        service_type: cdr.service_type,
+        total_price: sum(cdr.rating),
+        count: count("*")
+      })
       |> where([cdr], cdr.client_code == ^client_code)
       |> where(
         [cdr],
@@ -298,11 +302,15 @@ defmodule TsgGlobal.RatingService do
       |> Repo.all()
 
     total =
-      Enum.map(charges_by_service, & &1.sum)
+      Enum.map(charges_by_service, & &1.total_price)
       |> Enum.sum()
       |> ceils()
 
-    {:ok, %{total: total, charges_by_service: charges_by_service}}
+    total_units =
+      Enum.map(charges_by_service, & &1.count)
+      |> Enum.sum()
+
+    {:ok, %{total: total, count: total_units, charges_by_service: charges_by_service}}
   end
 
   defp ceils(0), do: 0
