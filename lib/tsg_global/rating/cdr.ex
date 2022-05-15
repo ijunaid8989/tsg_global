@@ -11,7 +11,7 @@ defmodule TsgGlobal.Rating.CDR do
     field(:rating, :float)
     field(:service_type, :string)
     field(:source_number, :string)
-    field(:success, :boolean, default: false)
+    field(:success, :boolean, default: true)
     field(:timestamp, :utc_datetime)
   end
 

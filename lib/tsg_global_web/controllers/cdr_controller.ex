@@ -8,7 +8,7 @@ defmodule TsgGlobalWeb.CDRController do
   @spec create(any, map) :: {:error, atom | %{__changeset__: map}} | Plug.Conn.t()
   def create(conn, params) do
     with {:ok, cdrs} <- RatingService.process(params),
-         {:ok, _stats} <- RatingService.insert_ratings(cdrs) do
+         :ok <- RatingService.insert_ratings(cdrs) do
       send_resp(
         conn,
         :created,

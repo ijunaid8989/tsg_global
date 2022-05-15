@@ -5,12 +5,39 @@ defmodule TsgGlobal.RatingService do
 
   import Ecto.Query, warn: false
   alias TsgGlobal.Repo
-  alias Ecto.Multi
 
   alias NimbleCSV.RFC4180, as: CSV
 
   alias TsgGlobal.Rating.CDR
 
+
+  @doc """
+  By pass the coming params from controller, we are supporting 2 type of params for CDRs.
+
+  1. when a file has been uploaded %{"file" => %Plug.Upload{content_type: "text/csv", filename: "cdrs.csv", path: "/tmp/plug-1652/multipart-1652618903-171279885495035-6"}
+  2. when cdrs are gving in form of a list such as below
+
+    {
+      "cdrs": [
+          {
+              "client_code": "CLT2",
+              "client_name": "Client2",
+              "source_number": "12159538568",
+              "destination_number": "17066135090",
+              "direction": "OUTBOUND",
+              "service_type": "SMS",
+              "success": "TRUE",
+              "carrier": "Carrier C",
+              "timestamp": "01/01/2021 00:01:33"
+
+          }
+      ]
+    }
+
+  the process method would justify, if the file given then goes to CSV parse otherwise it would go to validate the coming cdrs if they are valid or not.
+
+  if none of the above case is given, it would send a tuple of invalid params.
+  """
   @spec process(map) :: {:error, atom() | %{__changeset__: map}} | {:ok, list}
   def process(%{"file" => %Plug.Upload{} = file}), do: parse(file.path)
 
@@ -18,6 +45,25 @@ defmodule TsgGlobal.RatingService do
 
   def process(_params), do: {:error, :invalid_params}
 
+  @doc """
+  Method takes a file path as params, but has a default param as well for the cdrs csv.
+
+  The purpose of the method is to parse the CSV file, and convert them to a list of maps where each map would consider
+
+    1. client_code
+    2. client_name
+    3. source_number
+    4. destination_number
+    5. direction
+    6. service_type
+    7. success
+    8. carrier
+    9. timestamp
+
+  String fields are being downcased before saving to DB. and if timestamp is not given, it would default it to `DateTime.utc_now()`.
+
+  It also handles the error tuple for CSV, if the CSV is missing a header or else, It would through a tuple CSV file error.
+  """
   @spec parse(any) :: {:ok, list()} | {:error, atom()}
   def parse(file_path \\ "priv/csvs/cdrs.csv") do
     cdrs =
@@ -54,7 +100,31 @@ defmodule TsgGlobal.RatingService do
       {:error, :csv_file_error}
   end
 
-  @spec validate_cdrs(any) :: {:error, %{__changeset__: map}} | {:ok, list()}
+  @doc """
+  Method takes a list of cdrs as below,
+
+  ## Example
+  %{"cdrs" =>
+    [
+      %{
+        "carrier" => "Carrier C",
+        "client_code" => "CLT2",
+        "client_name" => "Client2",
+        "destination_number" => "17066135090",
+        "direction" => "OUTBOUND",
+        "service_type" => "SMS",
+        "source_number" => "12159538568",
+        "success" => "TRUE",
+        "timestamp" => "01/01/2021 00:01:33"
+      }
+    ]
+  }
+
+  It first formats and downcase every string and fill up the timestamp if missing or format if given and by pass each CDR entity to Changeset to validate all keys presence.
+
+  if any of the map is not validated through changeset, it would return an error tuple with changeset for fallback return error otheriwse it would return a list of cdrs.
+  """
+  @spec validate_cdrs(list()) :: {:error, %{__changeset__: map}} | {:ok, list()}
   def validate_cdrs(cdrs) do
     cdrs =
       Enum.map(cdrs, fn cdr ->
@@ -82,9 +152,65 @@ defmodule TsgGlobal.RatingService do
     end
   end
 
-  @spec insert_ratings(list()) :: {:ok, map()} | {:error, atom()}
+  @doc """
+  Method is responsible for adding the rating for each cdr, this is how it proceed,
+  1. It ignores all those cdrs which are not succeeded as true
+  2. then the reducer start with a tuple of 2 empty lists, where one is holding all valid CDRs and one for invalid CDRs.
+  3. While quering the ETS table of ranking for rates, get_service_rate/4 goes by client_code, timestamp of CDR, direction service type.
+  4. get_service_rate query ETS table and fetch rates against client code and date is being checked between the start and end date of selling rates period.
+
+  If this nothing found for the time period, direction, and client_code as well as service type, we are assuring that we are not offering that service so it will be ignored
+  and will go to invalid list of cdrs.
+
+  if available then from ETS map for rates, we provide service_type, i.e "sms", "mms", "voice", it gives rates if service not found it return an error tuple instead.
+
+  Once all ratings are concluded, we are doing a Repo.insert_all for that, with on_conflict: :nothing as we have defined a unique index on
+
+  `[:client_code, :source_number, :destination_number, :direction, :service_type, :timestamp]`
+
+  with given cdrs.csv it look as these above values cannot be duplicated.
+
+  here is a use case to verify rates.
+
+  the outbound rates for clt1 are
+
+    CLT1,2020-01-01,0.01 {sms},0.01,0.01,OUTBOUND
+    CLT1,2021-01-01,0.02 {sms},0.01,0.02,OUTBOUND
+
+  in below maps, these are 2 records which for first one, it fall in 2020-01-01 to 2021-01-01 so rate for sms is 0.01
+
+  and in 2nd map its 0.02
+
+    Below maps are results of reducer's valid_cdrs
+    %{
+      carrier: "Carrier A",
+      client_code: "clt1",
+      client_name: "Client1",
+      destination_number: "18552322012",
+      direction: "outbound",
+      rating: 0.01,
+      service_type: "sms",
+      source_number: "15048587135",
+      success: true,
+      timestamp: ~U[2020-12-31 23:59:48Z]
+    },
+    %{
+      carrier: "Carrier C",
+      client_code: "clt1",
+      client_name: "Client1",
+      destination_number: "12705575114",
+      direction: "outbound",
+      rating: 0.02,
+      service_type: "sms",
+      source_number: "19285515376",
+      success: true,
+      timestamp: ~U[2021-01-01 00:02:18Z]
+    },
+
+  """
+  @spec insert_ratings(list()) :: :ok | {:error, atom()}
   def insert_ratings(cdrs) do
-    {valid, _invalid} =
+    {valid_cdrs, _invalid} =
       cdrs
       |> Enum.filter(&(&1.success == true))
       |> Enum.reduce({[], []}, fn cdr, {cdr_with_rating, invalid_service_type} = _acc ->
@@ -102,11 +228,10 @@ defmodule TsgGlobal.RatingService do
         end
       end)
 
-    case length(valid) > 0 do
+    case length(valid_cdrs) > 0 do
       true ->
-        Multi.new()
-        |> Multi.insert_all(:insert_all, CDR, valid, on_conflict: :nothing)
-        |> Repo.transaction()
+        Repo.insert_all(CDR, valid_cdrs, on_conflict: :nothing)
+        :ok
 
       false ->
         {:error, :invalid_cdrs}

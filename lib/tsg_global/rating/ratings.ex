@@ -1,9 +1,84 @@
 defmodule TsgGlobal.Ratings do
+  @moduledoc """
+  Module: TsgGlobal.Ratings
+
+  This module is responsible for 2 jobs. When application will be started, it will look for standard rates cvs file and upload all rates to ETS for future uses, Standards
+  rates can be changed as well just keep pressure off the DB, we are loading CSV to ETS, as its reluctantly faster to query.
+
+  The CSV for rates consist of rates for sms, mms and voice, where as same client code can have more than one standard rates but with a time period.
+
+  the :ratings ets table results into this
+
+  ## ratings table
+
+  iex(3)> :ets.tab2list(:ratings)
+    [
+      {"clt1", 1577836800, 1609459200, "outbound",
+      [%{"mms" => 0.01, "sms" => 0.01, "voice" => 0.01}]},
+      {"clt1", 1609459200, 1657803278, "outbound",
+      [%{"mms" => 0.01, "sms" => 0.02, "voice" => 0.02}]},
+      {"clt1", 1577836800, 1652619278, "inbound",
+      [%{"mms" => 0.0001, "sms" => 0.0001, "voice" => 0.005}]},
+      {"clt3", 1577836800, 1652619278, "outbound",
+      [%{"mms" => 0.04, "sms" => 0.01, "voice" => 0.02}]},
+      {"clt3", 1577836800, 1652619278, "inbound",
+      [%{"mms" => 0.0001, "sms" => 0.0001, "voice" => 0.005}]},
+      {"clt2", 1577836800, 1652619278, "outbound",
+      [%{"mms" => 0.03, "sms" => 0.02, "voice" => 0.04}]},
+      {"clt2", 1577836800, 1652619278, "inbound",
+      [%{"mms" => 0.0001, "sms" => 0.0001, "voice" => 0.006}]}
+    ]
+
+  each row is saving
+  1. client_code
+  2. start_date (Unix for better querying as integer)
+  3. end_date
+  4. direction
+  5. a map for rates
+
+  Reason for having an enddate is: one of the existing client_code has to rates with a time period, so it should have an end date as well to justify ratings.
+
+  The below module goes by the index and group by sell rates with client code and direction, if a direction have more than on rates, it will use each one for start and end date.
+
+  in current situation, we have
+
+  {"outbound", "clt1"} => [
+    %{
+      client_code: "clt1",
+      direction: "outbound",
+      mms_fee: 0.01,
+      price_start_date: ~U[2020-01-01 00:00:00Z],
+      sms_fee: 0.01,
+      voice_fee: 0.01
+    },
+    %{
+      client_code: "clt1",
+      direction: "outbound",
+      mms_fee: 0.01,
+      price_start_date: ~U[2021-01-01 00:00:00Z],
+      sms_fee: 0.02,
+      voice_fee: 0.02
+    }
+  ],
+
+  so clt1 has the end date as the start date of 2nd clts with same direction of outbound.
+
+  this way the records which are between clt1 direction range date would be charged 0.01 and others would be charged 0.02.
+
+  all other client codes which are only one, they have end date to be 60 days ahead of current utc time. so they can cover all those cdrs which dont have timestamp
+  and the timestamp would be considered as utc_now/0.
+
+  At first step, it would add the details of sell rates to ETS,
+
+  as next It would use Rating Service to support existing CDRs to be rates accordingly.
+  """
+
   use GenServer
 
   @ratings :ratings
 
   alias NimbleCSV.RFC4180, as: CSV
+  alias TsgGlobal.RatingService
 
   def start_link(_args) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -24,6 +99,10 @@ defmodule TsgGlobal.Ratings do
 
   def handle_continue(:initialize, state) do
     insert_ratings()
+
+    RatingService.parse()
+    |> elem(1)
+    |> RatingService.insert_ratings()
 
     {:noreply, state}
   end
