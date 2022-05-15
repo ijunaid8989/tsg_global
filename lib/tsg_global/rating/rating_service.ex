@@ -247,7 +247,7 @@ defmodule TsgGlobal.RatingService do
         # 1
         list_of_chunks = Enum.chunk_every(valid_cdrs, @batch_size)
 
-        Repo.transaction(
+        Repo.checkout(
           fn ->
             Enum.each(list_of_chunks, fn rows ->
               Repo.insert_all(CDR, rows, on_conflict: :nothing)
@@ -282,34 +282,32 @@ defmodule TsgGlobal.RatingService do
     end
   end
 
-  @doc """
-  Returns the list of cdrs.
+  # mention about pg_trgm and to_tsvector but we have an index on this
 
-  ## Examples
+  def monthly_charges(client_code, year, month) do
+    charges_by_service =
+      CDR
+      |> group_by([cdr], cdr.service_type)
+      |> select([cdr], %{service_type: cdr.service_type, sum: sum(cdr.rating)})
+      |> where([cdr], cdr.client_code == ^client_code)
+      |> where(
+        [cdr],
+        fragment("date_part('month', ?)", cdr.timestamp) == ^String.to_integer(month)
+      )
+      |> where([cdr], fragment("date_part('year', ?)", cdr.timestamp) == ^String.to_integer(year))
+      |> Repo.all()
 
-      iex> list_cdrs()
-      [%CDR{}, ...]
+    total =
+      Enum.map(charges_by_service, & &1.sum)
+      |> Enum.sum()
+      |> ceils()
 
-  """
-  def list_cdrs do
-    Repo.all(CDR)
+    {:ok, %{total: total, charges_by_service: charges_by_service}}
   end
 
-  @doc """
-  Gets a single cdr.
+  defp ceils(0), do: 0
 
-  Raises `Ecto.NoResultsError` if the Cdr does not exist.
-
-  ## Examples
-
-      iex> get_cdr!(123)
-      %CDR{}
-
-      iex> get_cdr!(456)
-      ** (Ecto.NoResultsError)
-
-  """
-  def get_cdr!(id), do: Repo.get!(CDR, id)
+  defp ceils(n), do: Float.ceil(n, 2)
 
   defp bool?("TRUE"), do: true
   defp bool?(_any), do: false
