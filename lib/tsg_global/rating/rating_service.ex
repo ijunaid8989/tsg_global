@@ -11,8 +11,15 @@ defmodule TsgGlobal.RatingService do
 
   alias TsgGlobal.Rating.CDR
 
-  @spec import(any) :: {:ok, list()} | {:error, atom()}
-  def import(file_path \\ "priv/csvs/cdrs.csv") do
+  @spec process(map) :: {:error, atom() | %{__changeset__: map}} | {:ok, list}
+  def process(%{"file" => %Plug.Upload{} = file}), do: parse(file.path)
+
+  def process(%{"cdrs" => cdrs}), do: validate_cdrs(cdrs)
+
+  def process(_params), do: {:error, :invalid_params}
+
+  @spec parse(any) :: {:ok, list()} | {:error, atom()}
+  def parse(file_path \\ "priv/csvs/cdrs.csv") do
     cdrs =
       File.stream!(file_path)
       |> CSV.parse_stream()
@@ -52,12 +59,12 @@ defmodule TsgGlobal.RatingService do
     cdrs =
       Enum.map(cdrs, fn cdr ->
         %{
-          client_code: String.downcase(cdr["client_code"]),
+          client_code: String.downcase(cdr["client_code"] || ""),
           client_name: cdr["client_name"],
           source_number: cdr["source_number"],
           destination_number: cdr["destination_number"],
-          direction: String.downcase(cdr["direction"]),
-          service_type: String.downcase(cdr["service_type"]),
+          direction: String.downcase(cdr["direction"] || ""),
+          service_type: String.downcase(cdr["service_type"] || ""),
           success: bool?(cdr["success"]),
           carrier: cdr["carrier"],
           timestamp: parse_datetime(cdr["timestamp"])

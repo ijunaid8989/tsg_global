@@ -28,11 +28,10 @@ defmodule TsgGlobalWeb.FallbackController do
     |> render(:"400", error: "Invalid CDRs detected.")
   end
 
-  # This clause is an example of how to handle resources that cannot be found.
-  def call(conn, {:error, :not_found}) do
+  def call(conn, {:error, :invalid_params}) do
     conn
-    |> put_status(:not_found)
+    |> put_status(:bad_request)
     |> put_view(TsgGlobalWeb.ErrorView)
-    |> render(:"404")
+    |> render(:"400", error: "Params are not valid.")
   end
 end
