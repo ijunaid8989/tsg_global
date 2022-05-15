@@ -25,18 +25,55 @@ defmodule TsgGlobal.RatingService do
                        timestamp
                      ] ->
       %{
-        client_code: client_code,
+        client_code: String.downcase(client_code),
         client_name: client_name,
         source_number: source_number,
         destination_number: destination_number,
-        direction: direction,
-        service_type: service_type,
+        direction: String.downcase(direction),
+        service_type: String.downcase(service_type),
         success: bool?(success),
         carrier: carrier,
         timestamp: parse_datetime(timestamp)
       }
     end)
     |> Enum.to_list()
+  end
+
+  def insert_ratings(cdrs) do
+    {valid, invalid} =
+      cdrs
+      |> Enum.filter(&(&1.success == true))
+      |> Enum.reduce({[], []}, fn cdr, {cdr_with_rating, invalid_service_type} = _acc ->
+        case get_service_rate(
+               cdr.client_code,
+               DateTime.to_unix(cdr.timestamp),
+               cdr.direction,
+               cdr.service_type
+             )
+             |> IO.inspect() do
+          {:error, "ratings not available"} -> {cdr_with_rating, [cdr | invalid_service_type]}
+          rate -> {[Map.put(cdr, :rating, rate) | cdr_with_rating], invalid_service_type}
+        end
+      end)
+      |> IO.inspect()
+  end
+
+  defp get_service_rate(client_code, date, direction, service_type) do
+    :ets.select(
+      :ratings,
+      [
+        {{:"$1", :"$2", :"$3", :"$4", :"$5"},
+         [
+           {:andalso,
+            {:andalso, {:andalso, {:==, :"$1", client_code}, {:==, :"$4", direction}},
+             {:>=, {:const, date}, :"$2"}}, {:"=<", {:const, date}, :"$3"}}
+         ], [:"$5"]}
+      ]
+    )
+    |> case do
+      [] -> {:error, "ratings not available"}
+      [[rates]] -> rates[service_type]
+    end
   end
 
   @doc """
