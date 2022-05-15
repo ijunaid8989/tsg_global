@@ -94,9 +94,15 @@ defmodule TsgGlobal.RatingService do
         end
       end)
 
-    Multi.new()
-    |> Multi.insert_all(:insert_all, CDR, valid)
-    |> Repo.transaction()
+    case length(valid) > 0 do
+      true ->
+        Multi.new()
+        |> Multi.insert_all(:insert_all, CDR, valid)
+        |> Repo.transaction()
+
+      false ->
+        {:error, :invalid_cdrs}
+    end
   end
 
   defp get_service_rate(client_code, date, direction, service_type) do

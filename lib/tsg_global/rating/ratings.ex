@@ -100,7 +100,8 @@ defmodule TsgGlobal.Ratings do
     end
   end
 
-  defp manage_end_datetime(nil), do: DateTime.utc_now() |> DateTime.to_unix()
+  defp manage_end_datetime(nil),
+    do: DateTime.utc_now() |> DateTime.add(60 * 24 * 60 * 60, :second) |> DateTime.to_unix()
 
   defp manage_end_datetime({rating, _index}), do: DateTime.to_unix(rating.price_start_date)
 end

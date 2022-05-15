@@ -3,8 +3,8 @@ defmodule TsgGlobalWeb.ErrorView do
 
   # If you want to customize a particular status code
   # for a certain format, you may uncomment below.
-  def render("400.json", _assigns) do
-    %{errors: %{detail: "The file is not a valid CSV file."}}
+  def render("400.json", %{error: error}) do
+    %{errors: %{detail: error}}
   end
 
   # By default, Phoenix returns the status message from

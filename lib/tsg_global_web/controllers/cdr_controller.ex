@@ -11,7 +11,7 @@ defmodule TsgGlobalWeb.CDRController do
       send_resp(
         conn,
         :created,
-        "CDRs had been rated and saved."
+        "CDRs had been rated and saved. (Invalid ones are ignored)"
       )
     end
   end
@@ -22,7 +22,7 @@ defmodule TsgGlobalWeb.CDRController do
       send_resp(
         conn,
         :created,
-        "CDRs had been rated and saved."
+        "CDRs had been rated and saved. (Invalid ones are ignored)"
       )
     end
   end

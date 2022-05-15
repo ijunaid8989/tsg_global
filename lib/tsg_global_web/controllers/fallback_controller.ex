@@ -18,7 +18,14 @@ defmodule TsgGlobalWeb.FallbackController do
     conn
     |> put_status(:bad_request)
     |> put_view(TsgGlobalWeb.ErrorView)
-    |> render(:"400")
+    |> render(:"400", error: "The file is not a valid CSV file.")
+  end
+
+  def call(conn, {:error, :invalid_cdrs}) do
+    conn
+    |> put_status(:bad_request)
+    |> put_view(TsgGlobalWeb.ErrorView)
+    |> render(:"400", error: "Invalid CDRs detected.")
   end
 
   # This clause is an example of how to handle resources that cannot be found.
