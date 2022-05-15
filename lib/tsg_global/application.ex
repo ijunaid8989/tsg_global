@@ -10,6 +10,7 @@ defmodule TsgGlobal.Application do
     children = [
       # Start the Ecto repository
       TsgGlobal.Repo,
+      TsgGlobal.Ratings,
       # Start the Telemetry supervisor
       TsgGlobalWeb.Telemetry,
       # Start the PubSub system

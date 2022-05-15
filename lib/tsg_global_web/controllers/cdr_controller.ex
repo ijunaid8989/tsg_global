@@ -10,8 +10,19 @@ defmodule TsgGlobalWeb.CDRController do
          {:ok, _stats} <- RatingService.insert_ratings(cdrs) do
       send_resp(
         conn,
-        :accepted,
-        "File contents was imported."
+        :created,
+        "CDRs had been rated and saved."
+      )
+    end
+  end
+
+  def create(conn, %{"cdrs" => cdrs}) do
+    with {:ok, cdrs} <- RatingService.validate_cdrs(cdrs),
+         {:ok, _stats} <- RatingService.insert_ratings(cdrs) do
+      send_resp(
+        conn,
+        :created,
+        "CDRs had been rated and saved."
       )
     end
   end

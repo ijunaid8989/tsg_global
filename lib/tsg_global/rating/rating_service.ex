@@ -47,12 +47,31 @@ defmodule TsgGlobal.RatingService do
       {:error, :csv_file_error}
   end
 
+  @spec validate_cdrs(any) :: {:error, %{__changeset__: map}} | {:ok, list()}
   def validate_cdrs(cdrs) do
+    cdrs =
+      Enum.map(cdrs, fn cdr ->
+        %{
+          client_code: String.downcase(cdr["client_code"]),
+          client_name: cdr["client_name"],
+          source_number: cdr["source_number"],
+          destination_number: cdr["destination_number"],
+          direction: String.downcase(cdr["direction"]),
+          service_type: String.downcase(cdr["service_type"]),
+          success: bool?(cdr["success"]),
+          carrier: cdr["carrier"],
+          timestamp: parse_datetime(cdr["timestamp"])
+        }
+      end)
+
     Enum.map(cdrs, &CDR.changeset(%CDR{}, &1))
     |> Enum.filter(&(&1.valid? == false))
     |> case do
-      [] -> :ok
-      list -> {:error, List.first(list)}
+      [] ->
+        {:ok, cdrs}
+
+      list ->
+        {:error, List.first(list)}
     end
   end
 
@@ -127,75 +146,12 @@ defmodule TsgGlobal.RatingService do
   """
   def get_cdr!(id), do: Repo.get!(CDR, id)
 
-  @doc """
-  Creates a cdr.
-
-  ## Examples
-
-      iex> create_cdr(%{field: value})
-      {:ok, %CDR{}}
-
-      iex> create_cdr(%{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def create_cdr(attrs \\ %{}) do
-    %CDR{}
-    |> CDR.changeset(attrs)
-    |> Repo.insert()
-  end
-
-  @doc """
-  Updates a cdr.
-
-  ## Examples
-
-      iex> update_cdr(cdr, %{field: new_value})
-      {:ok, %CDR{}}
-
-      iex> update_cdr(cdr, %{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def update_cdr(%CDR{} = cdr, attrs) do
-    cdr
-    |> CDR.changeset(attrs)
-    |> Repo.update()
-  end
-
-  @doc """
-  Deletes a cdr.
-
-  ## Examples
-
-      iex> delete_cdr(cdr)
-      {:ok, %CDR{}}
-
-      iex> delete_cdr(cdr)
-      {:error, %Ecto.Changeset{}}
-
-  """
-  def delete_cdr(%CDR{} = cdr) do
-    Repo.delete(cdr)
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking cdr changes.
-
-  ## Examples
-
-      iex> change_cdr(cdr)
-      %Ecto.Changeset{data: %CDR{}}
-
-  """
-  def change_cdr(%CDR{} = cdr, attrs \\ %{}) do
-    CDR.changeset(cdr, attrs)
-  end
-
   defp bool?("TRUE"), do: true
   defp bool?(_any), do: false
 
   # This could have been done through Timex very easily as well but I didnt want to take that road ;)
+  defp parse_datetime(nil), do: DateTime.utc_now()
+
   defp parse_datetime(datetime) do
     ~r[(?<day>\d{1,2})/(?<month>\d{1,2})/(?<year>\d{4}) (?<hour>\d{1,2}):(?<minutes>\d{1,2}):(?<seconds>\d{1,2})]
     |> Regex.named_captures(datetime)
