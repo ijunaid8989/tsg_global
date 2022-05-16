@@ -264,25 +264,14 @@ defmodule TsgGlobal.RatingService do
     end
   end
 
-  defp get_service_rate(client_code, date, direction, service_type) do
-    :ets.select(
-      :ratings,
-      [
-        {{:"$1", :"$2", :"$3", :"$4", :"$5"},
-         [
-           {:andalso,
-            {:andalso, {:andalso, {:==, :"$1", client_code}, {:==, :"$4", direction}},
-             {:>=, {:const, date}, :"$2"}}, {:"=<", {:const, date}, :"$3"}}
-         ], [:"$5"]}
-      ]
-    )
-    |> case do
-      [] -> {:error, "ratings not available"}
-      [[rates]] -> rates[service_type]
-    end
-  end
+  @doc """
+  Method takes a client code, year and a month as params, its just merely a query with grouping of service type, as We want to get details along each service, so we are
+  grouping by service_type, and using Sum and count through query.
 
-  # mention about pg_trgm and to_tsvector but we have an index on this
+  The below process is quite possible with Elixir only, where you can just get the data and then reduce it as you like.
+
+  There is one other solution to do text search which requires pg_trgm and to_tsvector for full text search againt client_code, but we have an index already on it to make it quick.
+  """
 
   def monthly_charges(client_code, year, month) do
     charges_by_service =
@@ -311,6 +300,24 @@ defmodule TsgGlobal.RatingService do
       |> Enum.sum()
 
     {:ok, %{total: total, count: total_units, charges_by_service: charges_by_service}}
+  end
+
+  defp get_service_rate(client_code, date, direction, service_type) do
+    :ets.select(
+      :ratings,
+      [
+        {{:"$1", :"$2", :"$3", :"$4", :"$5"},
+         [
+           {:andalso,
+            {:andalso, {:andalso, {:==, :"$1", client_code}, {:==, :"$4", direction}},
+             {:>=, {:const, date}, :"$2"}}, {:"=<", {:const, date}, :"$3"}}
+         ], [:"$5"]}
+      ]
+    )
+    |> case do
+      [] -> {:error, "ratings not available"}
+      [[rates]] -> rates[service_type]
+    end
   end
 
   defp ceils(0), do: 0
