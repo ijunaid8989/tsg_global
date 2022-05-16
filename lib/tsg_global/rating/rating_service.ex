@@ -282,7 +282,7 @@ defmodule TsgGlobal.RatingService do
         total_price: sum(cdr.rating),
         count: count("*")
       })
-      |> where([cdr], cdr.client_code == ^client_code)
+      |> where([cdr], cdr.client_code == ^String.downcase(client_code))
       |> where(
         [cdr],
         fragment("date_part('month', ?)", cdr.timestamp) == ^String.to_integer(month)

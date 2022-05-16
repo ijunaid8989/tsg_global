@@ -100,9 +100,11 @@ defmodule TsgGlobal.Ratings do
   def handle_continue(:initialize, state) do
     insert_ratings()
 
-    RatingService.parse()
-    |> elem(1)
-    |> RatingService.insert_ratings()
+    if Application.get_env(:tsg_global, :mix_env) == :dev do
+      RatingService.parse()
+      |> elem(1)
+      |> RatingService.insert_ratings()
+    end
 
     {:noreply, state}
   end
