@@ -166,3 +166,21 @@ Technical interview takes up to 1 hour. First we spend some time discussing your
 At the end of the interview we always leave time if you have any questions for us, but in general if you come up with a question during the interview please don't hesitate to ask - idea is that this interview should be as relaxed as possible.
 
 If you have any questions related to the position, this task, our work culture or TSG in general please don't hesitate to email us at developers@tsgglobal.com at any time. 
+
+
+
+## README.
+
+There is no extra setup required to run the application, 
+
+Each Module, has its moduledoc and docs to for further information.
+
+I have done what I could have done with specific time period along side with my current job duties so Pardon me, if something is missing.
+
+No Front End Added, I wanted to but its been 4, 5 days already so I am finishing this now.
+
+required CSVs are present in `priv/csvs/*.csv`.
+
+Each Module docs will tell you what is happening under the hood.
+
+Thank you. Best of luck to me :)

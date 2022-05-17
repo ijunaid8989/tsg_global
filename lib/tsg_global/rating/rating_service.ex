@@ -214,9 +214,14 @@ defmodule TsgGlobal.RatingService do
   1. Queue processing, i.e Kafka, RabbitMQ, Oban
   2. Broadway, Flow or GenStage
   3. Task.async_stream/3
+  4. If don't want to bring any other library and stay within core Elixir, I would Also use a DynamicSupervisor with one to one strategy, which will add a new child on demand,
+
+      when API request will come, the below chunks will go to each of their worker, to perform their task. restart in case of failure as well.
 
   As its stated that `average customer daily makes few million transactions` the very first 2 solution can be an overkill for that purpose.
   The Below method of Repo.insert_all() is doing a trick of Batch size accepted by PostgreSQL and inserting chunk by chunk to DB.
+
+  **(If I would have more time, I would have gone with First Broadway, then RabbitMQ instead of straight DB transactions)**
 
   If requests may increase we can go to Task.async_stream() with max_concurrency: 10 (or 8 depends on Cores)
   """
@@ -271,6 +276,8 @@ defmodule TsgGlobal.RatingService do
   The below process is quite possible with Elixir only, where you can just get the data and then reduce it as you like.
 
   There is one other solution to do text search which requires pg_trgm and to_tsvector for full text search againt client_code, but we have an index already on it to make it quick.
+
+  NOTE: Total and total units can also possible through PostgreSQL's grouping sets, I tried to use that but I was unable to run the query properly, So I skipped that, FYI.
   """
 
   def monthly_charges(client_code, year, month) do
